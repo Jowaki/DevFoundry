@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from config import settings
+from models import CodeGenerationRequest, AgentMessage
+from agents.architecture import ArchitectureAgent
 
 # Create FastAPI app
 app = FastAPI(
@@ -10,7 +12,7 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Allow requests from frontend (CORS = Cross-Origin Resource Sharing)
+# Allow requests from frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:8000"],
@@ -19,21 +21,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health check endpoint
+# Initialize agents
+architecture_agent = ArchitectureAgent()
+
+# Health check
 @app.get("/health")
 async def health_check():
-    """Verify API is running"""
     return {
         "status": "healthy",
         "model": settings.OPENAI_MODEL,
         "debug": settings.DEBUG
     }
 
-# Placeholder for later
+# NEW: Design architecture endpoint
+@app.post("/design-architecture")
+async def design_architecture(request: CodeGenerationRequest):
+    """
+    Takes a feature spec and returns system architecture design
+    """
+    try:
+        result = architecture_agent.design_system(request.feature_spec)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/")
 async def root():
     return {"message": "🚀 Multi-Agent Code Generation System"}
 
 if __name__ == "__main__":
-    # Run locally: uvicorn main:app --reload
     uvicorn.run(app, host="0.0.0.0", port=8000)

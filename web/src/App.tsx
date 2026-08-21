@@ -32,38 +32,42 @@ function App() {
   const [currentAgent, setCurrentAgent] = useState('');
 
   const handleGenerate = async (featureSpec: string) => {
-    setSpec(featureSpec);
-    setLoading(true);
-    setAgentMessages([]);
-    setTimelineEvents([]);
-    setGeneratedCode('');
-    setGeneratedTests('');
-    setSecurityAudit('');
+  setSpec(featureSpec);
+  setLoading(true);
+  setAgentMessages([]);
+  
+  try {
+    // Call backend /design-architecture endpoint
+    const response = await fetch('http://localhost:8000/design-architecture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature_spec: featureSpec })
+    });
+    
+    const data = await response.json();
+    
+    // Add agent message
+    setAgentMessages([{
+      agent_name: data.agent_name,
+      role: data.role,
+      thinking: data.thinking,
+      output: data.output,
+      timestamp: new Date().toLocaleTimeString()
+    }]);
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error generating architecture: ' + error);
+  }
+  
+  setLoading(false);
+  };  
 
-    try {
-      // TODO: Connect to backend /generate endpoint
-      console.log('Generating code for:', featureSpec);
-      
-      // Placeholder: Show mock data for now
-      setAgentMessages([
-        {
-          agent_name: '🏗️ Architecture Agent',
-          role: 'Designing system architecture',
-          thinking: 'Analyzing the feature spec... I should design a REST API with FastAPI.',
-          timestamp: new Date().toLocaleTimeString()
-        }
-      ]);
-    } catch (error) {
-      console.error('Error generating code:', error);
-    }
-
-    setLoading(false);
-  };
 
   return (
     <div className="App">
       <header className="app-header">
-        <h1>🚀 Multi-Agent Code Generator</h1>
+        <h1>Multi-Agent Code Generator</h1>
         <p>AI agents collaborate to generate production-ready code</p>
       </header>
 
