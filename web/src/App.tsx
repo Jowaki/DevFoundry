@@ -39,6 +39,8 @@ function App() {
     setSecurityAudit('');
 
     try {
+      console.log('🚀 Starting full pipeline...');
+      
       const response = await fetch('http://localhost:8000/generate-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -50,67 +52,59 @@ function App() {
       }
 
       const data = await response.json();
-      console.log('Full response:', data);
+      console.log('📦 Full pipeline response:', data);
 
       const messages: AgentMessage[] = [];
       const events: TimelineEvent[] = [];
 
-      // Get architecture data
-      const archData = data.architecture || data.architecture_design;
-      if (archData) {
-        messages.push({
-          agent_name: archData.agent_name || '🏗️ Architecture Agent',
-          role: archData.role || 'Designing system architecture',
-          thinking: archData.thinking || 'Analyzing architecture...',
-          output: archData.output,
-          timestamp: new Date().toLocaleTimeString()
-        });
+      // Process each agent's output
+      const agentOrder = [
+        { key: 'architecture', name: '🏗️ Architecture Agent' },
+        { key: 'code', name: '💻 Code Generation Agent' },
+        { key: 'tests', name: '🧪 Testing Agent' },
+        { key: 'security', name: '🔒 Security Agent' }
+      ];
 
-        events.push({
-          agent_name: '🏗️ Architecture Agent',
-          status: 'completed',
-          timestamp: new Date().toLocaleTimeString(),
-          duration: 2
-        });
-      }
+      agentOrder.forEach((agent) => {
+        const agentData = data[agent.key];
+        if (agentData && !agentData.error) {
+          messages.push({
+            agent_name: agentData.agent_name || agent.name,
+            role: agentData.role || '',
+            thinking: agentData.thinking || '',
+            output: agentData.output,
+            timestamp: new Date().toLocaleTimeString()
+          });
 
-      // Get code data - handle multiple possible keys
-      let codeData = data.code || data.code_generation || data.generated_code;
-      
-      if (codeData) {
-        console.log('Code data found:', codeData);
-        
-        messages.push({
-          agent_name: codeData.agent_name || '💻 Code Generation Agent',
-          role: codeData.role || 'Writing production-ready code',
-          thinking: codeData.thinking || 'Generated code...',
-          output: codeData.output,
-          timestamp: new Date().toLocaleTimeString()
-        });
+          events.push({
+            agent_name: agent.name,
+            status: 'completed',
+            timestamp: new Date().toLocaleTimeString(),
+            duration: 2
+          });
 
-        // Extract code - try multiple fields
-        let code = codeData.extracted_code || codeData.code || codeData.output || '';
-        
-        if (code) {
-          console.log('Setting code, length:', code.length);
-          setGeneratedCode(code);
+          // Set content for each agent type
+          if (agent.key === 'code') {
+            const code = agentData.extracted_code || agentData.output || '';
+            setGeneratedCode(code);
+            console.log('✅ Code set:', code.length, 'chars');
+          } else if (agent.key === 'tests') {
+            const tests = agentData.extracted_tests || agentData.output || '';
+            setGeneratedTests(tests);
+            console.log('✅ Tests set:', tests.length, 'chars');
+          } else if (agent.key === 'security') {
+            setSecurityAudit(agentData.output || '');
+            console.log('✅ Security audit set:', agentData.output?.length || 0, 'chars');
+          }
         }
-
-        events.push({
-          agent_name: '💻 Code Generation Agent',
-          status: 'completed',
-          timestamp: new Date().toLocaleTimeString(),
-          duration: 3
-        });
-      } else {
-        console.warn('No code data found in response');
-      }
+      });
 
       setAgentMessages(messages);
       setTimelineEvents(events);
+      console.log('✅ UI updated with all 4 agents');
       
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Error:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
       alert('Error: ' + errorMsg);
     }

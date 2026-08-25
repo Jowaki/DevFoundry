@@ -1,33 +1,41 @@
 .code-output {
-  padding: 20px;
+  padding: 10px;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  background: #f9f9f9;
-  margin: 20px 0;
+  border-radius: 6px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .code-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .code-header h2 {
   margin: 0;
   color: #333;
+  font-size: 14px;
 }
 
 .download-btn {
-  padding: 10px 20px;
+  padding: 6px 12px;
   background: #4CAF50;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   transition: background 0.3s;
   white-space: nowrap;
+  flex-shrink: 0;
+  height: 28px;
 }
 
 .download-btn:hover:not(:disabled) {
@@ -37,31 +45,39 @@
 .download-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .tabs {
   display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
-  border-bottom: 2px solid #e0e0e0;
-  overflow-x: auto;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .tab {
-  padding: 10px 15px;
+  padding: 8px 12px;
   background: none;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
   color: #666;
   font-weight: 500;
   transition: all 0.3s;
   white-space: nowrap;
+  font-size: 12px;
 }
 
 .tab.active {
   color: #2196F3;
   border-bottom-color: #2196F3;
+  background: #f9f9f9;
+}
+
+.tab:hover:not(:disabled) {
+  background: #f9f9f9;
 }
 
 .tab:disabled {
@@ -72,23 +88,24 @@
 .code-container {
   background: white;
   border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 15px;
-  min-height: 300px;
-  max-height: 600px;
+  border-radius: 4px;
+  padding: 10px;
+  flex: 1;
   overflow: auto;
+  min-height: 200px;
+  font-size: 11px;
 }
 
 .code-block {
   margin: 0;
   background: #282c34;
   color: #abb2bf;
-  padding: 15px;
-  border-radius: 4px;
+  padding: 10px;
+  border-radius: 3px;
   overflow-x: auto;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.5;
+  font-family: 'Courier New', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
   word-break: break-word;
   white-space: pre-wrap;
 }
@@ -99,26 +116,29 @@
 }
 
 .code-stats {
-  margin-top: 15px;
-  padding: 10px;
+  margin-top: 8px;
+  padding: 8px 10px;
   background: #e8f5e9;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 3px;
+  font-size: 11px;
   color: #2e7d32;
+  border-left: 3px solid #4CAF50;
+  flex-shrink: 0;
 }
 
 .loading-text,
 .empty-state {
   color: #999;
   text-align: center;
-  padding: 40px 20px;
+  padding: 20px 15px;
   font-style: italic;
+  font-size: 12px;
 }
 
-/* Better scrollbar styling */
+/* Scrollbar */
 .code-container::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 
 .code-container::-webkit-scrollbar-track {
@@ -127,9 +147,50 @@
 
 .code-container::-webkit-scrollbar-thumb {
   background: #888;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
 .code-container::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+@media (max-width: 768px) {
+  .code-output {
+    padding: 8px;
+  }
+
+  .code-header {
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .code-header h2 {
+    font-size: 13px;
+  }
+
+  .download-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .tab {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .code-container {
+    padding: 8px;
+    font-size: 10px;
+    min-height: 150px;
+  }
+
+  .code-block {
+    padding: 8px;
+    font-size: 10px;
+  }
+
+  .code-stats {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
 }
