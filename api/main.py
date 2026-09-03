@@ -1,17 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import uvicorn
 from config import settings
 from models import CodeGenerationRequest
-from agents.architecture import ArchitectureAgent
-from agents.code_gen import CodeGenAgent
-from agents.testing import TestingAgent
-from agents.security import SecurityAgent
+from agents.orchestrator import OrchestratorAgent
+from agents.pdf_generator import PDFGenerator
+import json
+import tempfile
+import os
 
 app = FastAPI(
     title="Multi-Agent Code Generation API",
-    description="AI system with 4 agents that collaborate to generate code",
-    version="0.1.0"
+    version="0.2.0"
 )
 
 app.add_middleware(
@@ -22,73 +23,90 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize all agents
-architecture_agent = ArchitectureAgent()
-code_gen_agent = CodeGenAgent()
-testing_agent = TestingAgent()
-security_agent = SecurityAgent()
+# Initialize agents
+orchestrator = OrchestratorAgent()
+pdf_gen = PDFGenerator()
 
 @app.get("/health")
 async def health_check():
     return {
         "status": "healthy",
         "model": settings.OPENAI_MODEL,
-        "debug": settings.DEBUG
+        "version": "0.2.0"
     }
 
-# Full pipeline endpoint
+# Full pipeline with orchestration
 @app.post("/generate-code")
 async def generate_code(request: CodeGenerationRequest):
-    """
-    Full pipeline: Architecture → Code → Tests → Security
-    """
+    """Full pipeline via orchestrator."""
     try:
-        print(f"\n🚀 Starting full pipeline for: {request.feature_spec[:50]}...")
+        result = orchestrator.orchestrate_generation(request.feature_spec)
         
-        # Step 1: Architecture
-        print("1️⃣ Architecture Agent...")
-        arch_result = architecture_agent.design_system(request.feature_spec)
-        if arch_result.get('error'):
-            raise HTTPException(status_code=500, detail=arch_result['error'])
+        if result.get('error'):
+            raise HTTPException(status_code=500, detail=result['error'])
         
-        # Step 2: Code Generation
-        print("2️⃣ Code Generation Agent...")
-        code_result = code_gen_agent.generate_code(
-            arch_result['output'],
-            request.feature_spec
-        )
-        if code_result.get('error'):
-            raise HTTPException(status_code=500, detail=code_result['error'])
-        
-        # Get clean code for next steps
-        clean_code = code_result.get('extracted_code') or code_result.get('output') or ''
-        
-        # Step 3: Testing
-        print("3️⃣ Testing Agent...")
-        test_result = testing_agent.generate_tests(clean_code, arch_result['output'])
-        
-        # Step 4: Security
-        print("4️⃣ Security Agent...")
-        security_result = security_agent.audit_code(clean_code, arch_result['output'])
-        
-        print("✅ All agents complete!\n")
-        
-        # Return complete response
-        return {
-            "feature_spec": request.feature_spec,
-            "architecture": arch_result,
-            "code": code_result,
-            "tests": test_result,
-            "security": security_result
-        }
+        return result
         
     except Exception as e:
-        print(f"❌ Pipeline error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Regenerate with fixes
+@app.post("/regenerate-with-fixes")
+async def regenerate_with_fixes(data: dict):
+    """Regenerate code with fixes for identified issues."""
+    try:
+        feature_spec = data.get('feature_spec')
+        previous_code = data.get('previous_code')
+        issues = data.get('issues', {})
+        
+        if not all([feature_spec, previous_code, issues]):
+            raise ValueError("Missing required fields")
+        
+        result = orchestrator.regenerate_with_fixes(
+            feature_spec, 
+            previous_code, 
+            issues
+        )
+        
+        if result.get('error'):
+            raise HTTPException(status_code=500, detail=result['error'])
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Generate PDF report
+@app.post("/generate-pdf")
+async def generate_pdf(data: dict):
+    """Generate PDF report from pipeline result."""
+    try:
+        orchestrator_result = data.get('result')
+        
+        if not orchestrator_result:
+            raise ValueError("No result provided")
+        
+        # Generate PDF
+        pdf_bytes = pdf_gen.generate_report(orchestrator_result)
+        
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+        
+        # Return file
+        return FileResponse(
+            tmp_path,
+            media_type="application/pdf",
+            filename="code-generation-report.pdf"
+        )
+        
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():
-    return {"message": "🚀 Multi-Agent Code Generation System"}
+    return {"message": " Multi-Agent Code Generation System v0.2.0"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

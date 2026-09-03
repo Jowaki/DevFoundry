@@ -23,11 +23,14 @@ interface TimelineEvent {
 function App() {
   const [spec, setSpec] = useState('');
   const [loading, setLoading] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [generatedCode, setGeneratedCode] = useState('');
   const [generatedTests, setGeneratedTests] = useState('');
   const [securityAudit, setSecurityAudit] = useState('');
+  const [issues, setIssues] = useState<any>({ critical: [], medium: [] });
+  const [fullResult, setFullResult] = useState<any>(null);
 
   const handleGenerate = async (featureSpec: string) => {
     setSpec(featureSpec);
@@ -37,9 +40,10 @@ function App() {
     setGeneratedCode('');
     setGeneratedTests('');
     setSecurityAudit('');
+    setIssues({ critical: [], medium: [] });
 
     try {
-      console.log('🚀 Starting full pipeline...');
+      console.log('🚀 Starting pipeline...');
       
       const response = await fetch('http://localhost:8000/generate-code', {
         method: 'POST',
@@ -52,64 +56,130 @@ function App() {
       }
 
       const data = await response.json();
-      console.log('📦 Full pipeline response:', data);
+      console.log('📦 Pipeline result:', data);
 
       const messages: AgentMessage[] = [];
       const events: TimelineEvent[] = [];
 
-      // Process each agent's output
-      const agentOrder = [
-        { key: 'architecture', name: '🏗️ Architecture Agent' },
-        { key: 'code', name: '💻 Code Generation Agent' },
-        { key: 'tests', name: '🧪 Testing Agent' },
-        { key: 'security', name: '🔒 Security Agent' }
-      ];
-
-      agentOrder.forEach((agent) => {
-        const agentData = data[agent.key];
+      // Process pipeline
+      const pipeline = data.pipeline || {};
+      
+      ['architecture', 'code', 'tests', 'security'].forEach((agent, idx) => {
+        const agentData = pipeline[agent];
         if (agentData && !agentData.error) {
           messages.push({
-            agent_name: agentData.agent_name || agent.name,
-            role: agentData.role || '',
-            thinking: agentData.thinking || '',
+            agent_name: agentData.agent_name,
+            role: agentData.role,
+            thinking: agentData.thinking,
             output: agentData.output,
             timestamp: new Date().toLocaleTimeString()
           });
 
           events.push({
-            agent_name: agent.name,
+            agent_name: agentData.agent_name,
             status: 'completed',
             timestamp: new Date().toLocaleTimeString(),
-            duration: 2
+            duration: idx + 1
           });
 
-          // Set content for each agent type
-          if (agent.key === 'code') {
+          if (agent === 'code') {
             const code = agentData.extracted_code || agentData.output || '';
             setGeneratedCode(code);
-            console.log('✅ Code set:', code.length, 'chars');
-          } else if (agent.key === 'tests') {
+          } else if (agent === 'tests') {
             const tests = agentData.extracted_tests || agentData.output || '';
             setGeneratedTests(tests);
-            console.log('✅ Tests set:', tests.length, 'chars');
-          } else if (agent.key === 'security') {
+          } else if (agent === 'security') {
             setSecurityAudit(agentData.output || '');
-            console.log('✅ Security audit set:', agentData.output?.length || 0, 'chars');
           }
         }
       });
 
+      // Set issues
+      const extractedIssues = data.issues || { critical: [], medium: [] };
+      setIssues(extractedIssues);
+      setFullResult(data);
+
       setAgentMessages(messages);
       setTimelineEvents(events);
-      console.log('✅ UI updated with all 4 agents');
       
     } catch (error) {
       console.error('❌ Error:', error);
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      alert('Error: ' + errorMsg);
+      alert('Error: ' + error);
     }
 
     setLoading(false);
+  };
+
+  const handleRegenerate = async () => {
+    if (!generatedCode || !spec) {
+      alert('No code to regenerate');
+      return;
+    }
+
+    setRegenerating(true);
+
+    try {
+      console.log('🔄 Regenerating code with fixes...');
+      
+      const response = await fetch('http://localhost:8000/regenerate-with-fixes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feature_spec: spec,
+          previous_code: generatedCode,
+          issues: issues
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setGeneratedCode(data.regenerated_code || '');
+      setSecurityAudit(data.security_audit?.output || '');
+      
+      alert('✅ Code regenerated with fixes!');
+      
+    } catch (error) {
+      console.error('Error regenerating:', error);
+      alert('Error regenerating: ' + error);
+    }
+
+    setRegenerating(false);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!fullResult) {
+      alert('No result to download');
+      return;
+    }
+
+    try {
+      console.log('📄 Generating PDF...');
+      
+      const response = await fetch('http://localhost:8000/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ result: fullResult })
+      });
+
+      if (!response.ok) {
+        throw new Error('PDF generation failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'code-generation-report.pdf';
+      link.click();
+      
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Error downloading PDF: ' + error);
+    }
   };
 
   return (
@@ -124,6 +194,26 @@ function App() {
           <div className="left-column">
             <InputSpec onSubmit={handleGenerate} loading={loading} />
             <Timeline events={timelineEvents} currentAgent="" />
+            
+            {/* Action buttons */}
+            {generatedCode && (
+              <div className="action-buttons">
+                <button 
+                  onClick={handleRegenerate} 
+                  disabled={regenerating || loading}
+                  className="btn-regenerate"
+                >
+                  {regenerating ? '⏳ Regenerating...' : '🔄 Fix Issues & Regenerate'}
+                </button>
+                <button 
+                  onClick={handleDownloadPDF}
+                  disabled={loading || regenerating}
+                  className="btn-pdf"
+                >
+                  📄 Download PDF Report
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="right-column">
@@ -134,6 +224,33 @@ function App() {
               securityAudit={securityAudit}
               loading={loading}
             />
+            
+            {/* Issues display */}
+            {(issues.critical.length > 0 || issues.medium.length > 0) && (
+              <div className="issues-panel">
+                <h3>🔍 Issues Found</h3>
+                {issues.critical.length > 0 && (
+                  <div className="critical">
+                    <strong>🔴 Critical ({issues.critical.length})</strong>
+                    <ul>
+                      {issues.critical.map((issue: string, idx: number) => (
+                        <li key={idx}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {issues.medium.length > 0 && (
+                  <div className="medium">
+                    <strong>🟡 Medium ({issues.medium.length})</strong>
+                    <ul>
+                      {issues.medium.map((issue: string, idx: number) => (
+                        <li key={idx}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>
